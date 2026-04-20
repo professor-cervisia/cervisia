@@ -5,6 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>BrewLog v0.9</title>
   <style>
+
+ #cheers-screen {
+  position: fixed;
+  inset: 0;
+  background: black;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.cheers-text {
+  color: #33ff33;
+  font-family: 'Courier New', monospace;
+  font-size: 80px;
+  letter-spacing: 8px;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { transform: scale(1); opacity: 0.8; }
+  to   { transform: scale(1.1); opacity: 1; }
+}
+
+#fireworks {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+} 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body { height: 100%; background: #000; overflow: hidden; }
@@ -318,7 +348,7 @@ const SCREENS = {
     { text: '' },
     { text: 'Welkom terug, Professor Cervisia.', delay: 500 },
     { text: 'De ingevoerde waarden komen overeen met uw laatste notities.', cls: 'sys', delay: 300 },
-    { text: 'Verhoudingen en totaalvolume bevestigd.', delay: 210 },
+    { text: 'Verhoudingen van brouwsels bevestigd.', delay: 210 },
     { text: '' },
     { text: 'U heeft ervoor gekozen het proces niet langer af te wachten, maar te versnellen met een directe energie-impuls.', delay: 300 },
     { text: 'Korte duur. Hoge intensiteit.', cls: 'dim', delay: 300 },
@@ -380,7 +410,7 @@ const SCREENS = {
   qr6: [
     { text: 'BrewLog v0.9 – Eindstatus bereikt', cls: 'bright' },
     { text: '' },
-    { text: 'Welkom terug, Professor Cervisia.', delay: 450 },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 450 } ,
     { text: 'Alle stappen zijn doorlopen.', cls: 'sys', delay: 260 },
     { text: 'Alle afwijkingen gevolgd.', delay: 180 },
     { text: 'Uw experiment is voltooid.', cls: 'bright', delay: 260 },
@@ -408,7 +438,60 @@ const SCREENS = {
     { text: '' },
     { text: 'Aanbeveling: Proef het resultaat. In naam van de wetenschap.', delay: 340 },
     { text: '' },
-    { text: '[ SESSIE BEËINDIGD ]', cls: 'sep', delay: 220 },
+    { text: '[ SESSIE BEËINDIGD ]', cls: 'sep', delay: 220 }, setTimeout(startCheers, 10000);
+
+    function startCheers() {
+  document.getElementById('cheers-screen').style.display = 'flex';
+  startFireworks();
+}
+  function startFireworks() {
+  const canvas = document.getElementById('fireworks');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  let particles = [];
+
+  function createExplosion(x, y) {
+    for (let i = 0; i < 80; i++) {
+      particles.push({
+        x: x,
+        y: y,
+        dx: (Math.random() - 0.5) * 6,
+        dy: (Math.random() - 0.5) * 6,
+        life: 100
+      });
+    }
+  }
+
+  function animate() {
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    particles.forEach((p, i) => {
+      p.x += p.dx;
+      p.y += p.dy;
+      p.life--;
+
+      ctx.fillStyle = "#33ff33";
+      ctx.fillRect(p.x, p.y, 2, 2);
+
+      if (p.life <= 0) particles.splice(i, 1);
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  setInterval(() => {
+    createExplosion(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height / 2
+    );
+  }, 600);
+
+  animate();
+}
   ],
 };
 
@@ -590,5 +673,10 @@ document.getElementById('terminal').addEventListener('click', () => {
   }
 })();
 </script>
+  <div id="cheers-screen">
+  <div class="cheers-text">CHEERS!</div>
+</div>
+
+<canvas id="fireworks"></canvas>
 </body>
 </html>
