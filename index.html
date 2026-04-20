@@ -519,6 +519,20 @@ function startFireworks() {
   animate();
 }
 
+};
+
+function playOpenSound() {
+  const audio = document.getElementById('open-audio');
+  if (!audio) return;
+
+  audio.pause();
+  audio.currentTime = 0;
+
+  audio.play().catch(() => {
+    console.log('Open-geluid kon niet automatisch worden afgespeeld.');
+  });
+}
+
 const outputEl   = document.getElementById('output');
 const promptArea = document.getElementById('prompt-area');
 const inputField = document.getElementById('input-field');
@@ -633,6 +647,9 @@ async function showError(msg) {
 
 async function runScreen(screenId) {
   const lines = SCREENS[screenId];
+    if (['qr1', 'qr2', 'qr3', 'qr4', 'qr5', 'qr6'].includes(screenId)) {
+    playOpenSound();
+  }
   if (!lines) {
     addLine('FOUT: scherm niet gevonden: ' + screenId, 'err');
     return;
@@ -707,5 +724,6 @@ document.getElementById('terminal').addEventListener('click', () => {
 
 <canvas id="fireworks"></canvas>
 <audio id="cheers-audio" src="cheers.mp3" preload="auto"></audio>
+  <audio id="open-audio" src="Open.mp3" preload="auto"></audio>
 </body>
 </html>
