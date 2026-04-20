@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BrewLog v0.9</title>
+  <style>
+
+ #cheers-screen {
+  position: fixed;
+  inset: 0;
+  background: black;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.cheers-text {
+  color: #33ff33;
+  font-family: 'Courier New', monospace;
+  font-size: 80px;
+  letter-spacing: 8px;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { transform: scale(1); opacity: 0.8; }
+  to   { transform: scale(1.1); opacity: 1; }
+}
+
+#fireworks {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+} 
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; background: #000; overflow: hidden; }
+    body { display: flex; flex-direction: column; }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent, transparent 3px,
+        rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    @keyframes flicker {
+      0%,100% { opacity:1 }
+      91%      { opacity:1 }
+      92%      { opacity:.97 }
+      93%      { opacity:1 }
+      97%      { opacity:.99 }
+    }
+
+    #terminal {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      color: #33ff33;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 22px 20px 14px;
+      overflow: hidden;
+      animation: flicker 9s infinite;
+      position: relative;
+    }
+
+    #terminal::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%);
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    #output {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      padding-right: 2px;
+    }
+    #output::-webkit-scrollbar { display: none; }
+
+    .line {
+      min-height: 1.7em;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .dim    { color: #1e9e1e; }
+    .bright { color: #88ff88; font-weight: bold; }
+    .err    { color: #ff3c3c; }
+    .warn   { color: #ffaa00; }
+    .sep    { color: #1e9e1e; letter-spacing: 1px; }
+    .echo   { color: #55cc55; }
+    .sys    { color: #00cccc; }
+
+    #ok-btn {
+      display: none;
+      margin: 10px 0 4px;
+      background: transparent;
+      border: 1px solid #33ff33;
+      color: #33ff33;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      padding: 6px 22px;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+    #ok-btn:hover { background: #33ff3322; }
+    #ok-btn:active { background: #33ff3344; }
+
+    #prompt-area {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding-top: 6px;
+      flex-shrink: 0;
+    }
+
+    #input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #33ff33;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      caret-color: transparent;
+      min-width: 0;
+    }
+    #input-field::selection { background: rgba(51,255,51,.2); }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    #cursor {
+      display: inline-block;
+      width: 9px;
+      height: 1em;
+      background: #33ff33;
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      flex-shrink: 0;
+    }
+
+    #prompt-label { color: #1e9e1e; user-select: none; white-space: nowrap; }
+
+    .img-label { color: #1e9e1e; font-size: 12px; margin-bottom: 4px; }
+
+    .capture-image {
+      display: block;
+      max-width: 100%;
+      border: 1px solid #1e9e1e;
+      filter: grayscale(100%) brightness(0.85) contrast(1.15);
+    }
+
+    @media (max-width: 480px) {
+      #terminal { font-size: 13px; padding: 14px 13px 10px; }
+    }
+  </style>
+</head>
+<body>
+<div id="terminal">
+  <div id="output"></div>
+  <div id="prompt-area">
+    <span id="prompt-label">&gt;&gt;</span>
+    <input type="text" id="input-field"
+      autocomplete="off" autocorrect="off"
+      autocapitalize="none" spellcheck="false"
+      inputmode="text" />
+    <span id="cursor"></span>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// AANPASSEN
+// 1. Codes hieronder
+// 2. Bestandsnamen van afbeeldingen hieronder
+// 3. Zet dit HTML-bestand, professor.jpg en professor2.jpg in dezelfde map
+// ══════════════════════════════════════════════════
+
+const CODE_QR1 = '1739';
+const CODE_QR2 = '1920';
+const CODE_QR4 = '1107585'; // pas aan als QR4 een andere code moet krijgen
+const CODE_QR5 = '6871';
+
+const IMAGE_QR1 = 'Professor.jpg';
+const IMAGE_QR5 = 'Professor2.jpg';
+
+const SCREENS = {
+  qr1: [
+    { text: 'BrewLog v0.9 (beta)', cls: 'bright' },
+    { text: 'Cervisia Experimental Interface', cls: 'dim' },
+    { text: '' },
+    { text: 'Welkom, Professor Cervisia.', delay: 500 },
+    { text: 'Laatste sessie: onvolledig afgesloten', cls: 'warn', delay: 300 },
+    { text: 'Status: experiment onderbroken', cls: 'warn', delay: 200 },
+    { text: '' },
+    { text: 'Uw notities vertonen inconsistenties.', delay: 400 },
+    { text: 'Aanbevolen: doorgaan met laatst bekende stabiele variabelen', delay: 250 },
+    { text: '' },
+    { text: 'Voer autorisatiecode in om verder te gaan.', cls: 'dim', delay: 300 },
+  ],
+  qr1_input: {
+    type: 'code',
+    answer: CODE_QR1,
+    next: 'qr1_ok',
+    wrongCount: 0,
+    errMessages: [
+      'Autorisatie mislukt.\nCode niet herkend.\nSysteem logt deze poging.',
+      'Opnieuw mislukt.\nToegang blijft geblokkeerd.\nControleer de invoer.',
+      'Derde onjuiste invoer.\nHet systeem twijfelt aan uw identiteit.',
+      'Onbekende entiteit gedetecteerd.\nToegang geweigerd.'
+    ]
+  },
+  qr1_ok: [
+    { text: '' },
+    { text: 'BrewLog v0.9 – Sessie hersteld', cls: 'bright', delay: 300 },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 500 },
+    { text: 'Laatste stabiele observatie: voltooid.', delay: 350 },
+    { text: 'Daarna volgde een periode van afnemende focus en verhoogde consumptie.', delay: 250 },
+    { text: 'Activiteit stopte kort daarna.', cls: 'dim', delay: 250 },
+    { text: '' },
+    { text: 'Laatste beschikbare opname gevonden.', delay: 400 },
+    { text: 'Kwaliteit: verminderd', cls: 'warn', delay: 180 },
+    { text: 'Stabiliteit: twijfelachtig', cls: 'warn', delay: 180 },
+    { text: '' },
+    { text: 'Weergeven?', delay: 400 },
+    { action: 'show_ok_button', target: 'qr1_image' },
+  ],
+  qr1_image: [
+    { action: 'show_image', src: IMAGE_QR1, label: '[ OPNAME GELADEN ]', alt: 'Professor opname 1' },
+  ],
+
+  qr2: [
+    { text: 'BrewLog v0.9 – Sessie hervat', cls: 'bright' },
+    { text: '' },
+    { text: 'Welkom terug, Professor.', delay: 500 },
+    { text: 'U heeft een rustmoment genomen. Dat klopt.', delay: 350 },
+    { text: '' },
+    { text: 'Wat niet klopt… is wat daarna gebeurde.', cls: 'warn', delay: 450 },
+    { text: 'Of beter gezegd: wat er niet gebeurde.', delay: 220 },
+    { text: '' },
+    { text: 'U volgt normaal gesproken een vrij voorspelbaar patroon.', delay: 350 },
+    { text: 'Zelfs in minder stabiele toestand.', cls: 'dim', delay: 180 },
+    { text: '' },
+    { text: 'Dit keer ontbreekt de volgende stap volledig.', delay: 350 },
+    { text: '' },
+    { text: 'Mogelijke verklaring: geheugenfragment ontbreekt of is extern opgeslagen.', delay: 300 },
+    { text: '' },
+    { text: 'Aanbevolen actie: herstelprocedure starten.', delay: 350 },
+    { text: 'Voer herstelcode in om laatste routine te reconstrueren.', cls: 'dim', delay: 250 },
+  ],
+  qr2_input: {
+    type: 'code',
+    answer: CODE_QR2,
+    next: 'qr2_ok',
+    wrongCount: 0,
+    errMessages: [
+      'Herstel mislukt.\nCode niet herkend.\nSysteem wacht op correcte invoer.',
+      'Opnieuw onjuist.\nRoutine kon niet worden gereconstrueerd.',
+      'Derde poging mislukt.\nPatroon blijft incompleet.',
+      'Te veel afwijkingen.\nHerstelprocedure onderbroken.'
+    ]
+  },
+  qr2_ok: [
+    { text: '' },
+    { text: 'BrewLog v0.9 – Herstel geslaagd', cls: 'bright', delay: 300 },
+    { text: '' },
+    { text: 'Herstelcode geaccepteerd.', cls: 'sys', delay: 350 },
+    { text: 'Ontbrekend patroon succesvol gereconstrueerd.', delay: 250 },
+    { text: '' },
+    { text: 'Analyse van eerdere sessies bevestigt:', delay: 350 },
+    { text: 'Na elke rustfase volgt een vaste handeling.', delay: 240 },
+    { text: 'U noemt dit zelf: “opstarten”', cls: 'bright', delay: 320 },
+    { text: '' },
+    { text: 'Variabelen: warmte, extractie, stimulatie.', delay: 250 },
+    { text: 'Resultaat: verhoogde focus (tijdelijk).', cls: 'dim', delay: 200 },
+    { text: '' },
+    { text: 'Aanbeveling: hervat het experiment daar.', delay: 350 },
+  ],
+
+  qr3: [
+    { text: 'BrewLog v0.9 – Activiteit gedetecteerd', cls: 'bright' },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 500 },
+    { text: 'Caffeine-inname bevestigd.', cls: 'sys', delay: 320 },
+    { text: 'Bewegingspatroon hervat.', delay: 200 },
+    { text: 'U heeft zich richting uitgang verplaatst.', delay: 260 },
+    { text: '' },
+    { text: 'Sequentiecontrole…', cls: 'dim', delay: 500 },
+    { text: 'Afwijking gedetecteerd.', cls: 'warn', delay: 350 },
+    { text: '' },
+    { text: 'In 94% van de gevallen voert u vóór vertrek nog één handeling uit.', delay: 350 },
+    { text: 'Deze stap ontbreekt.', cls: 'warn', delay: 260 },
+    { text: '' },
+    { text: 'Wat u bent vergeten, zit verstopt in de naam van het huidige brouwsel.', delay: 350 },
+    { text: '' },
+    { text: 'Aanbeveling: Herstel deze stap vóór verdere verplaatsing.', cls: 'dim', delay: 300 },
+  ],
+
+  qr4: [
+    { text: 'BrewLog v0.9 – Sessie hervat', cls: 'bright' },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 500 },
+    { text: '' },
+    { text: 'Recente handelingen wijzen op een abrupte koerswijziging in het experiment.', delay: 360 },
+    { text: 'U was voornemens het laboratorium tijdelijk te verlaten om het hoofd te verfrissen.', delay: 250 },
+    { text: 'Toch veranderde dit plan vrijwel direct.', delay: 240 },
+    { text: '' },
+    { text: 'Laatste geregistreerde gedachte: “Waarom moet het zo traag?”', cls: 'bright', delay: 420 },
+    { text: '' },
+    { text: 'Daarna volgt een onvolledig fragment met verwijzingen naar verhoudingen, volgorde en een alternatieve methode.', delay: 300 },
+    { text: 'Verdere reconstructie is niet mogelijk zonder handmatige invoer.', cls: 'dim', delay: 240 },
+    { text: '' },
+    { text: 'Voer de reconstructiecode in om het experiment te hervatten.', cls: 'dim', delay: 300 },
+  ],
+  qr4_input: {
+    type: 'code',
+    answer: CODE_QR4,
+    next: 'qr4_ok',
+    wrongCount: 0,
+    errMessages: [
+      'Reconstructie mislukt.\nIngevoerde waarden komen niet overeen met bekende notities.',
+      'Opnieuw onjuist.\nVerhoudingen en volgorde blijven onvolledig.',
+      'Derde mislukte poging.\nHet systeem raadt nadere observatie aan.',
+      'Toegang geweigerd.\nDe reconstructiecode is onjuist.'
+    ]
+  },
+  qr4_ok: [
+    { text: '' },
+    { text: 'BrewLog v0.9 – Reconstructie voltooid', cls: 'bright', delay: 300 },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 500 },
+    { text: 'De ingevoerde waarden komen overeen met uw laatste notities.', cls: 'sys', delay: 300 },
+    { text: 'Verhoudingen van brouwsels bevestigd.', delay: 210 },
+    { text: '' },
+    { text: 'U heeft ervoor gekozen het proces niet langer af te wachten, maar te versnellen met een directe energie-impuls.', delay: 300 },
+    { text: 'Korte duur. Hoge intensiteit.', cls: 'dim', delay: 300 },
+    { text: 'Niet traditioneel, maar volgens uw notitie “voldoende om het op gang te brengen”.', delay: 240 },
+    { text: '' },
+    { text: 'Laatste handeling vond plaats op een locatie waar warmte direct en gecontroleerd kan worden toegepast.', delay: 340 },
+    { text: '' },
+    { text: 'Aanbeveling: hervat het experiment daar', delay: 340 },
+    { text: '(Waarschuwing: deze methode wijkt af van gangbare brouwnormen.)', cls: 'warn', delay: 200 },
+  ],
+
+  qr5: [
+    { text: 'BrewLog v0.9 – Analyse hervat', cls: 'bright' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 450 },
+    { text: 'Laatste fragmenten worden geladen…', delay: 300 },
+    { text: '' },
+    { text: '“…haazy… haas… hazy? dat klopt toch…”', cls: 'bright', delay: 400 },
+    { text: '(fragment incompleet)', cls: 'dim', delay: 240 },
+    { text: '' },
+    { text: 'Analyse: Spraakpatroon wijst op verhoogde intoxicatie en verminderde articulatie.', delay: 320 },
+    { text: 'Het leek erop dat u een van uw brouwsels heeft achtergelaten op een specifieke plek.', delay: 250 },
+    { text: 'U keek namelijk een bepaalde richting op.', delay: 220 },
+    { text: 'Hiervan is een visuele opname beschikbaar.', delay: 240 },
+    { text: 'Echter… recente afwijkingen in uw methode maken verdere aannames onbetrouwbaar.', delay: 250 },
+    { text: 'Verificatie vereist om visuele opname te laden.', delay: 250 },
+    { text: '' },
+    { text: 'Volgorde: bitterheid → alcoholgehalte → alcoholgehalte.', cls: 'warn', delay: 300 },
+    { text: 'Opmerking: het systeem verwacht drie waarden. De verificatiecode bepaalt de volgorde en de bron.', cls: 'dim', delay: 220 },
+  ],
+  qr5_input: {
+    type: 'code',
+    answer: CODE_QR5,
+    next: 'qr5_ok',
+    wrongCount: 0,
+    errMessages: [
+      'Verificatie mislukt.\nWaarden komen niet overeen met opgeslagen datasets.',
+      'Opnieuw onjuist.\nVolgorde of bron onjuist geïnterpreteerd.',
+      'Derde mislukte verificatie.\nVisuele opname blijft vergrendeld.',
+      'Identiteit niet bevestigd.\nToegang tot opname geweigerd.'
+    ]
+  },
+  qr5_ok: [
+    { text: '' },
+    { text: 'BrewLog v0.9 – Verificatie geslaagd', cls: 'bright', delay: 300 },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 450 },
+    { text: '' },
+    { text: 'Ingevoerde waarden komen overeen met opgeslagen datasets.', cls: 'sys', delay: 300 },
+    { text: 'Identiteit bevestigd.', delay: 220 },
+    { text: 'Laatst beschikbare opname vrijgegeven.', delay: 220 },
+    { text: '' },
+    { text: 'Weergeven?', delay: 340 },
+    { action: 'show_ok_button', target: 'qr5_image' },
+  ],
+  qr5_image: [
+    { action: 'show_image', src: IMAGE_QR5, label: '[ OPNAME VRIJGEGEVEN ]', alt: 'Professor opname 2' },
+  ],
+
+  qr6: [
+    { text: 'BrewLog v0.9 – Eindstatus bereikt', cls: 'bright' },
+    { text: '' },
+    { text: 'Welkom terug, Professor Cervisia.', delay: 450 },
+    { text: 'Alle stappen zijn doorlopen.', cls: 'sys', delay: 260 },
+    { text: 'Alle afwijkingen gevolgd.', delay: 180 },
+    { text: 'Uw experiment is voltooid.', cls: 'bright', delay: 260 },
+    { text: '' },
+    { text: 'Analyse toont een onregelmatig procesverloop.', delay: 300 },
+    { text: 'U week af van uw eigen methode, versnelde waar dat niet kon en vertrouwde op observaties die niet altijd betrouwbaar waren.', delay: 240 },
+    { text: '' },
+    { text: 'En toch…', cls: 'warn', delay: 600 },
+    { text: 'Het resultaat is geslaagd.', cls: 'bright', delay: 420 },
+    { text: '' },
+    { text: 'Laatste geregistreerde handeling: consumptie van het eindproduct.', delay: 300 },
+    { text: 'Daarna:', cls: 'dim', delay: 280 },
+    { text: 'geen nieuwe notities', delay: 180 },
+    { text: 'geen verdere invoer', delay: 180 },
+    { text: 'geen afsluiting van de sessie', delay: 180 },
+    { text: '' },
+    { text: 'Wel zijn er verspreid door de ruimte sporen gevonden van vervolgexperimenten… en ontbrekende voorraad.', delay: 300 },
+    { text: '' },
+    { text: 'Conclusie: De professor heeft het resultaat getest… en is daarna verder gegaan.', delay: 300 },
+    { text: 'Waarheen is niet vastgelegd.', cls: 'dim', delay: 180 },
+    { text: '' },
+    { text: 'Laatste notitie:', cls: 'dim', delay: 320 },
+    { text: '“Misschien was het nooit de bedoeling om het perfect te maken.”', cls: 'bright', delay: 280 },
+    { text: '“Misschien moest ik het gewoon vinden.”', cls: 'bright', delay: 220 },
+    { text: '' },
+    { text: 'Aanbeveling: Proef het resultaat. In naam van de wetenschap.', delay: 340 },
+    { text: '' },
+    { text: '[ SESSIE BEËINDIGD ]', cls: 'sep', delay: 220 },
+  ],
+};
+
+
+function startCheers() {
+  const cheersScreen = document.getElementById('cheers-screen');
+  const audio = document.getElementById('cheers-audio');
+
+  if (cheersScreen) cheersScreen.style.display = 'flex';
+
+  if (audio) {
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
+  startFireworks();
+}
+
+let fireworksStarted = false;
+
+function startFireworks() {
+  if (fireworksStarted) return;
+  fireworksStarted = true;
+
+  const canvas = document.getElementById('fireworks');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const particles = [];
+
+  function createExplosion(x, y) {
+    for (let i = 0; i < 80; i++) {
+      particles.push({
+        x,
+        y,
+        dx: (Math.random() - 0.5) * 6,
+        dy: (Math.random() - 0.5) * 6,
+        life: 100
+      });
+    }
+  }
+
+  function animate() {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.dx;
+      p.y += p.dy;
+      p.life -= 1;
+
+      ctx.fillStyle = '#33ff33';
+      ctx.fillRect(p.x, p.y, 2, 2);
+
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  setInterval(() => {
+    createExplosion(
+      Math.random() * canvas.width,
+      Math.random() * (canvas.height / 2)
+    );
+  }, 600);
+
+  animate();
+}
+
+const outputEl   = document.getElementById('output');
+const promptArea = document.getElementById('prompt-area');
+const inputField = document.getElementById('input-field');
+
+let currentInput = null;
+let skipTyping   = false;
+let isTyping     = false;
+
+function sleep(ms) {
+  return new Promise(res => setTimeout(res, ms));
+}
+
+function scrollDown() {
+  outputEl.scrollTop = outputEl.scrollHeight;
+}
+
+function addLine(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.textContent = text || '\u00A0';
+  outputEl.appendChild(div);
+  scrollDown();
+  return div;
+}
+
+async function typeLine(text, cls, charDelay) {
+  charDelay = charDelay ?? 25;
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.textContent = '\u00A0';
+  outputEl.appendChild(div);
+  isTyping = true;
+  for (let i = 0; i <= text.length; i++) {
+    if (skipTyping) { div.textContent = text || '\u00A0'; break; }
+    div.textContent = text.substring(0, i) || '\u00A0';
+    scrollDown();
+    if (i < text.length) await sleep(charDelay);
+  }
+  isTyping = false;
+  return div;
+}
+
+async function showImage(src, label, alt) {
+  const wrap = document.createElement('div');
+  wrap.style.margin = '8px 0';
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'img-label';
+  labelEl.textContent = label || '[ OPNAME GELADEN ]';
+
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = alt || 'Opname';
+  img.className = 'capture-image';
+
+  wrap.appendChild(labelEl);
+  wrap.appendChild(img);
+  outputEl.appendChild(wrap);
+  scrollDown();
+}
+
+async function runLines(lines) {
+  skipTyping = false;
+  for (const line of lines) {
+    if (line.action) {
+      await handleAction(line);
+      continue;
+    }
+    if (line.delay && !skipTyping) await sleep(line.delay);
+    if (!line.text) {
+      addLine('');
+    } else {
+      await typeLine(line.text, line.cls || '');
+    }
+  }
+  skipTyping = false;
+}
+
+async function handleAction(actionLine) {
+  if (actionLine.action === 'show_ok_button') {
+    const btn = document.createElement('button');
+    btn.id = 'ok-btn';
+    btn.textContent = '[ OK ]';
+    btn.style.display = 'block';
+    outputEl.appendChild(btn);
+    scrollDown();
+    btn.addEventListener('click', async () => {
+      btn.style.display = 'none';
+      await runScreen(actionLine.target);
+    });
+  }
+
+  if (actionLine.action === 'show_image') {
+    await showImage(actionLine.src, actionLine.label, actionLine.alt);
+  }
+}
+
+async function showError(msg) {
+  promptArea.style.display = 'none';
+  await sleep(200);
+  const lines = msg.split('\n');
+  for (const l of lines) {
+    await typeLine(l.trim(), 'err', 18);
+    await sleep(80);
+  }
+  addLine('');
+  promptArea.style.display = 'flex';
+  inputField.value = '';
+  inputField.focus();
+  scrollDown();
+}
+
+async function runScreen(screenId) {
+  const lines = SCREENS[screenId];
+  if (!lines) {
+    addLine('FOUT: scherm niet gevonden: ' + screenId, 'err');
+    return;
+  }
+
+  promptArea.style.display = 'none';
+  currentInput = null;
+
+  await runLines(lines);
+
+  if (screenId === 'qr6') {
+    setTimeout(startCheers, 10000);
+  }
+
+  const inputKey = screenId + '_input';
+  if (SCREENS[inputKey]) {
+    currentInput = { ...SCREENS[inputKey], wrongCount: 0 };
+    promptArea.style.display = 'flex';
+    inputField.value = '';
+    setTimeout(() => inputField.focus(), 200);
+    scrollDown();
+  }
+}
+
+inputField.onkeydown = async (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (!currentInput) return;
+
+  const inp = currentInput;
+  const val = inputField.value.trim();
+
+  if (inp.type === 'code') {
+    addLine('>> ' + val, 'echo');
+    inputField.value = '';
+
+    if (val.toLowerCase() === inp.answer.toLowerCase()) {
+      promptArea.style.display = 'none';
+      currentInput = null;
+      addLine('');
+      await runScreen(inp.next);
+    } else {
+      inp.wrongCount = (inp.wrongCount || 0) + 1;
+      const errIdx = Math.min(inp.wrongCount - 1, inp.errMessages.length - 1);
+      await showError(inp.errMessages[errIdx]);
+    }
+  }
+};
+
+document.getElementById('terminal').addEventListener('click', () => {
+  if (promptArea.style.display !== 'none') {
+    inputField.focus();
+  } else if (isTyping) {
+    skipTyping = true;
+  }
+});
+
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const start = params.get('scherm') || 'qr1';
+  if (SCREENS[start]) {
+    runScreen(start);
+  } else {
+    addLine('FOUT: onbekend startscherm "' + start + '"', 'err');
+    addLine('Beschikbare schermen: qr1, qr2, qr3, qr4, qr5, qr6', 'dim');
+  }
+})();
+</script>
+  <div id="cheers-screen">
+  <div class="cheers-text">CHEERS!</div>
+</div>
+
+<canvas id="fireworks"></canvas>
+<audio id="cheers-audio" src="cheers.mp3" preload="auto"></audio>
+</body>
+</html>
