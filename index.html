@@ -519,8 +519,6 @@ function startFireworks() {
   animate();
 }
 
-};
-
 function playOpenSound() {
   const audio = document.getElementById('open-audio');
   if (!audio) return;
@@ -661,7 +659,7 @@ async function runScreen(screenId) {
   await runLines(lines);
 
   if (screenId === 'qr6') {
-    setTimeout(startCheers, 50000);
+    setTimeout(startCheers, 5000);
   }
 
   const inputKey = screenId + '_input';
